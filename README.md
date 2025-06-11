@@ -73,10 +73,73 @@ pip install -r requirements.txt
 
 ## Usage
 
-1. Configure the target websites in the configuration file
-2. Run the main script:
+### Running the Refactored Main Script
+
+The main script can be run in two ways:
+
+1. Using the command-line interface:
 ```bash
-python src/main.py
+python -m fashion_scraper.main --site asos --category "https://www.asos.com/men/" --output data/raw --debug
+```
+
+Arguments:
+- `--site`: Website to scrape (currently only "asos" is supported)
+- `--category`: Category URL to scrape (required)
+- `--output`: Output directory for scraped data (default: "data/raw")
+- `--debug`: Enable debug logging (optional)
+
+2. Using the Python API:
+```python
+from fashion_scraper.asos import AsosScraper
+
+# Initialize the scraper
+scraper = AsosScraper()
+
+try:
+    # Get product links from a category
+    category_url = "https://www.asos.com/men/"
+    product_links = scraper.get_product_links(category_url)
+    
+    # Scrape each product
+    for link in product_links:
+        product_data = scraper.scrape_product(link)
+        print(f"Scraped product: {product_data['name']}")
+        
+finally:
+    # Always close the scraper when done
+    scraper.close()
+```
+
+## Development
+
+### Running Tests
+
+Run the test suite:
+```bash
+pytest src/fashion_scraper/tests/
+```
+
+Run tests with coverage:
+```bash
+pytest --cov=src/fashion_scraper src/fashion_scraper/tests/
+```
+
+### Code Style
+
+The project uses:
+- `black` for code formatting
+- `isort` for import sorting
+- `flake8` for linting
+
+Format code:
+```bash
+black src/
+isort src/
+```
+
+Check code style:
+```bash
+flake8 src/
 ```
 
 ## Data Structure
