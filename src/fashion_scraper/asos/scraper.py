@@ -1,7 +1,9 @@
+"""
+ASOS.com scraper implementation.
+"""
 from typing import Dict, List, Any
 import re
 from datetime import datetime
-from .base_scraper import BaseScraper
 import logging
 from bs4 import BeautifulSoup
 import time
@@ -18,27 +20,28 @@ import os
 from tenacity import retry, stop_after_attempt, wait_exponential
 import random
 
+from ..common.base_scraper import BaseScraper
+
 class AsosScraper(BaseScraper):
+    """ASOS.com scraper implementation."""
+    
     def __init__(self):
         super().__init__(
             base_url="https://www.asos.com",
             output_dir="data/raw/asos"
         )
-        self.logger = logging.getLogger(self.__class__.__name__)
         self.setup_driver()
-
+    
     def setup_driver(self):
         """Set up the Firefox WebDriver with appropriate options."""
         self.logger.info("Setting up Firefox WebDriver")
         try:
             firefox_options = Options()
-            # Remove headless mode to see the browser
-            # firefox_options.add_argument('--headless')
             firefox_options.add_argument('--width=1920')
             firefox_options.add_argument('--height=1080')
             firefox_options.set_preference('general.useragent.override', self.ua.random)
             
-            # Add additional preferences to improve stability
+            # Add preferences to avoid detection
             firefox_options.set_preference('dom.webdriver.enabled', False)
             firefox_options.set_preference('useAutomationExtension', False)
             firefox_options.set_preference('privacy.trackingprotection.enabled', False)
@@ -84,7 +87,7 @@ class AsosScraper(BaseScraper):
         except Exception as e:
             self.logger.error(f"Error setting up Firefox WebDriver: {str(e)}", exc_info=True)
             raise
-
+    
     def wait_for_page_load(self, timeout=30):
         """Wait for the page to be fully loaded."""
         try:
@@ -105,7 +108,7 @@ class AsosScraper(BaseScraper):
         except Exception as e:
             self.logger.warning(f"Error waiting for page load: {str(e)}")
             return False
-
+    
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def get_product_links(self, category_url: str) -> List[str]:
         """Get all product links from a category page using Selenium with retry logic."""
@@ -248,13 +251,14 @@ class AsosScraper(BaseScraper):
                 
                 # Fallback: Try to extract product links using BeautifulSoup
                 self.logger.info("Falling back to BeautifulSoup parsing...")
-                soup = BeautifulSoup(self.driver.page_source, "html.parser")
-                for a in soup.find_all("a", href=True):
-                    href = a["href"]
-                    if "asos.com" in href and "/prd/" in href:
+                soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+                for a in soup.find_all('a', href=True):
+                    href = a['href']
+                    if 'asos.com' in href and '/prd/' in href:
                         product_links.append(href)
-                    elif href.startswith("/prd/"):
+                    elif href.startswith('/prd/'):
                         product_links.append(f"https://www.asos.com{href}")
+                
                 if product_links:
                     self.logger.info(f"BeautifulSoup fallback found {len(product_links)} product links.")
                     return product_links
@@ -283,8 +287,8 @@ class AsosScraper(BaseScraper):
             
         except Exception as e:
             self.logger.error(f"Error in get_product_links: {str(e)}", exc_info=True)
-            raise  # Re-raise the exception for the retry decorator to handle
-
+            raise
+    
     def scrape_product(self, product_url: str) -> Dict[str, Any]:
         """Scrape individual product details with improved error handling and anti-bot measures."""
         self.logger.info(f"Starting to scrape product: {product_url}")
@@ -363,27 +367,12 @@ class AsosScraper(BaseScraper):
         except Exception as e:
             self.logger.error(f"Error scraping product {product_url}: {str(e)}", exc_info=True)
             raise
-
-    def scrape_reviews(self, product_url: str) -> List[Dict]:
-        """Scrape product reviews."""
-        self.logger.info(f"Starting to scrape reviews for: {product_url}")
-        reviews = []
-        # ASOS reviews are loaded dynamically via JavaScript
-        # We'll need to use Selenium for this part
-        # This is a placeholder implementation
-        self.logger.warning("Review scraping not implemented yet - using placeholder")
-        return reviews
-
+    
     def close(self):
-        """Close the WebDriver."""
-        if self.driver:
+        """Close the web driver and clean up resources."""
+        if hasattr(self, 'driver'):
             self.driver.quit()
-
+    
     def __del__(self):
-        """Clean up the WebDriver when the scraper is destroyed."""
-        try:
-            if hasattr(self, 'driver'):
-                self.driver.quit()
-                self.logger.info("Firefox WebDriver closed successfully")
-        except Exception as e:
-            self.logger.error(f"Error closing Firefox WebDriver: {str(e)}") 
+        """Ensure resources are cleaned up when the object is destroyed."""
+        self.close() 

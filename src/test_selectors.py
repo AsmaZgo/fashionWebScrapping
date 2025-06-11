@@ -7,9 +7,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.firefox import GeckoDriverManager
 import time
 import logging
+import os
+from bs4 import BeautifulSoup
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def setup_driver():
@@ -18,71 +20,105 @@ def setup_driver():
     firefox_options.add_argument('--width=1920')
     firefox_options.add_argument('--height=1080')
     
-    # Add additional preferences to improve stability
+    # Add preferences to avoid detection
     firefox_options.set_preference('dom.webdriver.enabled', False)
     firefox_options.set_preference('useAutomationExtension', False)
     firefox_options.set_preference('privacy.trackingprotection.enabled', False)
     
     # Install and setup geckodriver
     driver_path = GeckoDriverManager().install()
+    os.chmod(driver_path, 0o755)
+    
     service = Service(executable_path=driver_path)
     driver = webdriver.Firefox(service=service, options=firefox_options)
     driver.set_page_load_timeout(60)
     return driver
 
-def test_selectors():
+def test_selectors(url):
+    """Test different selectors on a product page."""
     driver = setup_driver()
     try:
-        # Test URL - ASOS men's clothing category
-        url = "https://www.asos.com/men/"
-        logger.info(f"Testing selectors on URL: {url}")
-        
+        logger.info(f"Testing selectors on: {url}")
         driver.get(url)
-        time.sleep(10)  # Wait for page to load
+        time.sleep(5)  # Wait for page load
         
-        # Test different selectors
-        selectors = [
-            # Product links
-            "a[data-testid='product-link']",
-            "a[data-auto-id='product-link']",
-            "a[data-test-id='product-link']",
-            "a[data-test='product-link']",
-            "a[data-auto='product-link']",
-            
-            # Product containers
-            "div[data-testid='product-card']",
-            "div[data-auto-id='product-card']",
-            "div[data-test-id='product-card']",
-            "div[data-test='product-card']",
-            "div[data-auto='product-card']",
-            
-            # Generic product selectors
-            "a[href*='/prd/']",
-            "div[class*='product']",
-            "div[class*='Product']",
-            "div[class*='item']",
-            "div[class*='Item']"
-        ]
+        # Test selectors
+        selectors = {
+            'name': [
+                'h1[data-testid="product-title"]',
+                'h1[data-auto-id="product-title"]',
+                'h1[class*="product-title"]',
+                'h1[class*="productTitle"]'
+            ],
+            'price': [
+                'span[data-testid="current-price"]',
+                'span[data-auto-id="current-price"]',
+                'span[class*="current-price"]',
+                'span[class*="price"]'
+            ],
+            'brand': [
+                'a[data-testid="brand-link"]',
+                'a[data-auto-id="brand-link"]',
+                'a[class*="brand-link"]',
+                'a[class*="brandLink"]'
+            ],
+            'description': [
+                'div[data-testid="product-description"]',
+                'div[data-auto-id="product-description"]',
+                'div[class*="product-description"]',
+                'div[class*="productDescription"]'
+            ]
+        }
         
-        for selector in selectors:
-            try:
-                elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                logger.info(f"Selector '{selector}' found {len(elements)} elements")
-                if elements:
-                    # Log the first element's HTML
-                    logger.info(f"First element HTML: {elements[0].get_attribute('outerHTML')}")
-            except Exception as e:
-                logger.error(f"Error with selector '{selector}': {str(e)}")
+        results = {}
+        for field, field_selectors in selectors.items():
+            results[field] = []
+            logger.info(f"\nTesting {field} selectors:")
+            for selector in field_selectors:
+                try:
+                    element = WebDriverWait(driver, 5).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                    )
+                    text = element.text.strip()
+                    if text:
+                        results[field].append((selector, text))
+                        logger.info(f"✓ {selector}: {text[:50]}...")
+                    else:
+                        logger.info(f"✗ {selector}: Found but empty")
+                except Exception as e:
+                    logger.info(f"✗ {selector}: {str(e)}")
         
-        # Also try to get all links on the page
-        all_links = driver.find_elements(By.TAG_NAME, "a")
-        product_links = [link.get_attribute('href') for link in all_links if link.get_attribute('href') and '/prd/' in link.get_attribute('href')]
-        logger.info(f"Found {len(product_links)} product links using tag name")
-        if product_links:
-            logger.info(f"Sample product link: {product_links[0]}")
-            
+        # Test BeautifulSoup fallback
+        logger.info("\nTesting BeautifulSoup fallback:")
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        for field, field_selectors in selectors.items():
+            for selector in field_selectors:
+                try:
+                    element = soup.select_one(selector)
+                    if element and element.text.strip():
+                        logger.info(f"✓ BS4 {selector}: {element.text.strip()[:50]}...")
+                    else:
+                        logger.info(f"✗ BS4 {selector}: Not found or empty")
+                except Exception as e:
+                    logger.info(f"✗ BS4 {selector}: {str(e)}")
+        
+        return results
+        
     finally:
         driver.quit()
 
 if __name__ == "__main__":
-    test_selectors() 
+    # Test with a few different product URLs
+    test_urls = [
+        "https://www.asos.com/vans/vans-super-lowpro-trainers-in-brown/prd/207733452",
+        "https://www.asos.com/on-running/on-cloudswift-4-running-trainers-in-grey/prd/207785711"
+    ]
+    
+    for url in test_urls:
+        results = test_selectors(url)
+        print("\nResults summary:")
+        for field, matches in results.items():
+            if matches:
+                print(f"\n{field}:")
+                for selector, text in matches:
+                    print(f"  {selector}: {text[:50]}...") 
