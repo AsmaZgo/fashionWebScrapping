@@ -97,12 +97,15 @@ class AsosScraper(BaseScraper):
             )
             
             # Wait for any AJAX requests to complete
-            WebDriverWait(self.driver, timeout).until(
-                lambda driver: driver.execute_script('return jQuery.active') == 0
-            )
+            try:
+                WebDriverWait(self.driver, timeout).until(
+                    lambda driver: driver.execute_script('return jQuery.active') == 0
+                )
+            except:
+                self.logger.debug("jQuery.active check failed, continuing anyway")
             
             # Wait for any dynamic content to load
-            time.sleep(5)
+            time.sleep(random.uniform(3, 5))
             
             return True
         except Exception as e:
@@ -133,114 +136,48 @@ class AsosScraper(BaseScraper):
             if not self.wait_for_page_load():
                 self.logger.warning("Page load wait failed, but continuing anyway")
             
-            # Try to find any product-related elements first
-            product_containers = []
-            container_selectors = [
-                'div[data-testid="product-grid"]',
-                'div[data-auto-id="product-grid"]',
-                'div[class*="productGrid"]',
-                'div[class*="product-grid"]',
-                'div[class*="product-list"]',
-                'div[class*="productContainer"]',
-                'div[class*="productWrapper"]',
-                'div[class*="product-grid"]',
-                'div[class*="product-list"]',
-                'div[class*="product-container"]',
-                'div[class*="product-wrapper"]',
-                'div[class*="product-grid-container"]',
-                'div[class*="product-list-container"]',
-                'div[class*="product-grid-wrapper"]',
-                'div[class*="product-list-wrapper"]'
-            ]
-            
-            # Try to find containers with increasing timeouts
-            for timeout in [10, 20, 30]:
-                for selector in container_selectors:
-                    try:
-                        self.logger.debug(f"Trying to find containers with selector: {selector} (timeout: {timeout}s)")
-                        WebDriverWait(self.driver, timeout).until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, selector))
-                        )
-                        containers = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                        if containers:
-                            self.logger.debug(f"Found {len(containers)} containers with selector: {selector}")
-                            product_containers.extend(containers)
-                            break
-                    except Exception as e:
-                        self.logger.debug(f"Error finding containers with {selector}: {str(e)}")
-                        continue
-                
-                if product_containers:
-                    break
-            
             # Scroll down multiple times to load more products
             self.logger.debug("Scrolling down to load more products...")
-            for i in range(3):  # Scroll 3 times
+            for i in range(5):  # Scroll 5 times
                 self.driver.execute_script(f"window.scrollTo(0, {(i + 1) * 1000});")
-                time.sleep(3)  # Wait between scrolls
+                time.sleep(random.uniform(2, 4))  # Random wait between scrolls
             
-            # Try to find links within containers first
-            if product_containers:
-                self.logger.debug("Trying to find links within product containers...")
-                for container in product_containers:
-                    try:
-                        # Try different methods to find links
-                        links = []
-                        
-                        # Method 1: Direct link search
-                        links.extend(container.find_elements(By.TAG_NAME, "a"))
-                        
-                        # Method 2: Search for links with specific attributes
-                        links.extend(container.find_elements(By.CSS_SELECTOR, "a[href*='/prd/']"))
-                        
-                        # Method 3: Search for links within product cards
-                        product_cards = container.find_elements(By.CSS_SELECTOR, "[class*='product']")
-                        for card in product_cards:
-                            links.extend(card.find_elements(By.TAG_NAME, "a"))
-                        
-                        # Process found links
+            # Try to find product links using multiple methods
+            link_selectors = [
+                'a[href*="/prd/"]',
+                'a[href*="asos.com"][href*="/prd/"]',
+                'a[class*="productLink"]',
+                'a[data-testid*="product"]',
+                'a[data-auto-id*="product"]',
+                'a[href*="product"]',
+                'a[class*="product"]',
+                'a[data-testid="product-link"]',
+                'a[data-auto-id="product-link"]',
+                'a[class*="product-card"]',
+                'a[class*="product-tile"]',
+                'a[class*="product-item"]'
+            ]
+            
+            for selector in link_selectors:
+                try:
+                    self.logger.debug(f"Trying to find links with selector: {selector}")
+                    links = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    if links:
+                        self.logger.debug(f"Found {len(links)} links with selector: {selector}")
                         for link in links:
                             try:
                                 href = link.get_attribute('href')
                                 if href and 'asos.com' in href and '/prd/' in href:
                                     product_links.append(href)
-                                    self.logger.debug(f"Found product link in container: {href}")
+                                    self.logger.debug(f"Found product link: {href}")
                             except Exception as e:
                                 self.logger.debug(f"Error getting href from link: {str(e)}")
-                    except Exception as e:
-                        self.logger.debug(f"Error finding links in container: {str(e)}")
-            
-            # If no links found in containers, try direct link search
-            if not product_links:
-                self.logger.debug("No links found in containers, trying direct link search...")
-                link_selectors = [
-                    'a[href*="/prd/"]',
-                    'a[href*="asos.com"][href*="/prd/"]',
-                    'a[class*="productLink"]',
-                    'a[data-testid*="product"]',
-                    'a[data-auto-id*="product"]'
-                ]
-                
-                for selector in link_selectors:
-                    try:
-                        self.logger.debug(f"Trying to find links with selector: {selector}")
-                        links = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                        if links:
-                            self.logger.debug(f"Found {len(links)} links with selector: {selector}")
-                            for link in links:
-                                try:
-                                    href = link.get_attribute('href')
-                                    if href and 'asos.com' in href and '/prd/' in href:
-                                        product_links.append(href)
-                                        self.logger.debug(f"Found product link: {href}")
-                                except Exception as e:
-                                    self.logger.debug(f"Error getting href from link: {str(e)}")
-                            
-                            if product_links:
-                                break
-                    except Exception as e:
-                        self.logger.debug(f"Error finding links with {selector}: {str(e)}")
-                        continue
+                        
+                        if product_links:
+                            break
+                except Exception as e:
+                    self.logger.debug(f"Error finding links with {selector}: {str(e)}")
+                    continue
             
             if not product_links:
                 # Save page source for debugging
@@ -282,7 +219,9 @@ class AsosScraper(BaseScraper):
                 
                 raise TimeoutException("Could not find any product elements on the page")
             
-            self.logger.info(f"Successfully extracted {len(product_links)} product links")
+            # Remove duplicates while preserving order
+            product_links = list(dict.fromkeys(product_links))
+            self.logger.info(f"Successfully extracted {len(product_links)} unique product links")
             return product_links
             
         except Exception as e:
@@ -310,11 +249,9 @@ class AsosScraper(BaseScraper):
                     f.write(self.driver.page_source)
                 raise Exception("Bot detection triggered")
             
-            # Try to find product details using Selenium first
             try:
                 product_data = {}
-                
-                # Try to find price (only working selector)
+                # Price
                 try:
                     price_element = WebDriverWait(self.driver, 10).until(
                         EC.presence_of_element_located((By.CSS_SELECTOR, 'span[data-testid="current-price"]'))
@@ -328,42 +265,294 @@ class AsosScraper(BaseScraper):
                 except Exception as e:
                     self.logger.warning(f"Failed to find price: {str(e)}")
                 
-                # Try to find other details using BeautifulSoup
                 soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-                
-                # Try to find name
+                # Name
                 name_element = soup.find('h1')
                 if name_element:
                     product_data['name'] = name_element.text.strip()
-                
-                # Try to find brand
+                # Brand
                 brand_element = soup.find('a', href=lambda x: x and '/brand/' in x)
                 if brand_element:
                     product_data['brand'] = brand_element.text.strip()
-                
-                # Try to find description
+                # Brand Details
+                brand_details = None
+                brand_section = soup.find('div', {'data-testid': 'productDescriptionBrand'})
+                if brand_section:
+                    brand_content = brand_section.find('div', class_='F_yfF')
+                    if brand_content:
+                        brand_details = brand_content.get_text(strip=True)
+                product_data['brand_details'] = brand_details
+
+                # About Me
+                about_me = None
+                about_section = soup.find('div', {'data-testid': 'productDescriptionAboutMe'})
+                if about_section:
+                    about_content = about_section.find('div', class_='F_yfF')
+                    if about_content:
+                        about_me = about_content.get_text(strip=True)
+                product_data['about_me'] = about_me
+
+                # Saved Items Count
+                saved_count = None
+                saved_div = soup.find('div', {'class': 'ii5iT'})
+                if saved_div:
+                    count_span = saved_div.find('span', {'class': 'BFMOG'})
+                    if count_span:
+                        try:
+                            saved_count = int(count_span.text.strip())
+                        except ValueError:
+                            saved_count = None
+                product_data['saved_count'] = saved_count
+
+                # Ratings and Reviews
+                ratings_data = {}
+                reviews_section = soup.find('div', {'data-testid': 'reviews-and-product-rating'})
+                if reviews_section:
+                    # Overall rating
+                    rating_div = reviews_section.find('div', {'data-testid': 'overall-rating'})
+                    if rating_div:
+                        try:
+                            ratings_data['overall_rating'] = float(rating_div.text.strip())
+                        except ValueError:
+                            ratings_data['overall_rating'] = None
+
+                    # Total reviews
+                    reviews_div = reviews_section.find('div', {'data-testid': 'total-reviews'})
+                    if reviews_div:
+                        reviews_text = reviews_div.text.strip()
+                        try:
+                            ratings_data['total_reviews'] = int(reviews_text.strip('()').split()[0])
+                        except (ValueError, IndexError):
+                            ratings_data['total_reviews'] = None
+
+                    # Recommendation percentage
+                    recommend_p = soup.find('p', {'class': 'NeBNz'})
+                    if recommend_p:
+                        recommend_text = recommend_p.text.strip()
+                        try:
+                            ratings_data['recommendation_percentage'] = int(recommend_text.split('%')[0])
+                        except (ValueError, IndexError):
+                            ratings_data['recommendation_percentage'] = None
+
+                    # Fit and Quality ratings
+                    rating_bars = soup.find_all('div', {'data-testid': 'ratingBar'})
+                    if len(rating_bars) >= 2:
+                        # Fit rating
+                        fit_bar = rating_bars[0]
+                        fit_percentage = fit_bar.find('div', {'class': 'qKPxB'})
+                        if fit_percentage:
+                            try:
+                                ratings_data['fit_rating'] = int(fit_percentage['style'].split(':')[1].strip('%;'))
+                            except (ValueError, KeyError):
+                                ratings_data['fit_rating'] = None
+
+                        # Quality rating
+                        quality_bar = rating_bars[1]
+                        quality_percentage = quality_bar.find('div', {'class': 'qKPxB'})
+                        if quality_percentage:
+                            try:
+                                ratings_data['quality_rating'] = int(quality_percentage['style'].split(':')[1].strip('%;'))
+                            except (ValueError, KeyError):
+                                ratings_data['quality_rating'] = None
+
+                product_data['ratings'] = ratings_data
+
+                # Most Recent Review
+                recent_review = {}
+                review_section = soup.find('section', {'aria-label': lambda x: x and 'Review' in x})
+                if review_section:
+                    # Review rating
+                    rating_p = review_section.find('p', {'class': 'seSWD'})
+                    if rating_p:
+                        try:
+                            recent_review['rating'] = float(rating_p.text.strip().split()[0])
+                        except (ValueError, IndexError):
+                            recent_review['rating'] = None
+
+                    # Review date
+                    date_span = review_section.find('span', {'class': 'L0xqb'})
+                    if date_span:
+                        recent_review['date'] = date_span.text.strip()
+
+                    # Reviewer status
+                    status_p = review_section.find('p', {'class': 'm0ehn'})
+                    if status_p:
+                        recent_review['status'] = status_p.text.strip()
+
+                    # Review title
+                    title_h4 = review_section.find('h4', {'class': 'DBTNB'})
+                    if title_h4:
+                        recent_review['title'] = title_h4.text.strip()
+
+                    # Review text
+                    review_button = review_section.find('button', {'data-testid': 'reviewsReadMore'})
+                    if review_button:
+                        recent_review['text'] = review_button.text.strip()
+
+                product_data['recent_review'] = recent_review
+
+                # Get all reviews
+                all_reviews = []
+                try:
+                    # Click "View All Reviews" button to load all reviews
+                    view_all_button = self.driver.find_element(By.CSS_SELECTOR, 'button[data-testid="reviewsViewAll"]')
+                    if view_all_button:
+                        view_all_button.click()
+                        # Wait for reviews to load
+                        time.sleep(2)  # Give time for reviews to load
+                        
+                        # Get the updated page source after clicking
+                        soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+                        
+                        # Find all review sections
+                        review_sections = soup.find_all('section', {'aria-label': lambda x: x and 'Review' in x})
+                        for review_section in review_sections:
+                            review_data = {}
+                            
+                            # Review rating
+                            rating_p = review_section.find('p', {'class': 'seSWD'})
+                            if rating_p:
+                                try:
+                                    review_data['rating'] = float(rating_p.text.strip().split()[0])
+                                except (ValueError, IndexError):
+                                    review_data['rating'] = None
+
+                            # Review date
+                            date_span = review_section.find('span', {'class': 'L0xqb'})
+                            if date_span:
+                                review_data['date'] = date_span.text.strip()
+
+                            # Reviewer status
+                            status_p = review_section.find('p', {'class': 'm0ehn'})
+                            if status_p:
+                                review_data['status'] = status_p.text.strip()
+
+                            # Review title
+                            title_h4 = review_section.find('h4', {'class': 'DBTNB'})
+                            if title_h4:
+                                review_data['title'] = title_h4.text.strip()
+
+                            # Review text
+                            review_button = review_section.find('button', {'data-testid': 'reviewsReadMore'})
+                            if review_button:
+                                review_data['text'] = review_button.text.strip()
+
+                            if review_data:  # Only add if we found some data
+                                all_reviews.append(review_data)
+                                
+                except Exception as e:
+                    self.logger.warning(f"Error getting all reviews: {str(e)}")
+                    # If we can't get all reviews, at least get the visible ones
+                    reviews_container = soup.find('div', {'class': 'FUfrx'})
+                    if reviews_container:
+                        review_sections = reviews_container.find_all('section', {'aria-label': lambda x: x and 'Review' in x})
+                        for review_section in review_sections:
+                            review_data = {}
+                            
+                            # Review rating
+                            rating_p = review_section.find('p', {'class': 'seSWD'})
+                            if rating_p:
+                                try:
+                                    review_data['rating'] = float(rating_p.text.strip().split()[0])
+                                except (ValueError, IndexError):
+                                    review_data['rating'] = None
+
+                            # Review date
+                            date_span = review_section.find('span', {'class': 'L0xqb'})
+                            if date_span:
+                                review_data['date'] = date_span.text.strip()
+
+                            # Reviewer status
+                            status_p = review_section.find('p', {'class': 'm0ehn'})
+                            if status_p:
+                                review_data['status'] = status_p.text.strip()
+
+                            # Review title
+                            title_h4 = review_section.find('h4', {'class': 'DBTNB'})
+                            if title_h4:
+                                review_data['title'] = title_h4.text.strip()
+
+                            # Review text
+                            review_button = review_section.find('button', {'data-testid': 'reviewsReadMore'})
+                            if review_button:
+                                review_data['text'] = review_button.text.strip()
+
+                            if review_data:  # Only add if we found some data
+                                all_reviews.append(review_data)
+
+                product_data['all_reviews'] = all_reviews
+
+                # Description
                 description_element = soup.find('div', class_=lambda x: x and 'description' in x.lower())
                 if description_element:
                     product_data['description'] = description_element.text.strip()
+                # Color
+                color = None
+                color_div = soup.find('div', {'data-testid': 'productColour'})
+                if color_div:
+                    color_p = color_div.find('p', class_='aKxaq')
+                    if color_p:
+                        color = color_p.text.strip()
+                product_data['colors'] = [color] if color else []
+                # Product Details (bullets)
+                details = []
+                # Look for the accordion item with Product Details
+                details_section = soup.find('span', class_='accordion-item-module_titleText__rWfj1', string='Product Details')
+                if details_section:
+                    # Find the next div with class F_yfF that contains the details
+                    details_div = details_section.find_next('div', class_='F_yfF')
+                    if details_div:
+                        # Get all list items
+                        list_items = details_div.find_all('li')
+                        if list_items:
+                            details = [li.get_text(strip=True) for li in list_items if li.get_text(strip=True)]
+                        else:
+                            # If no list items, get all text content
+                            text = details_div.get_text(strip=True)
+                            if text:
+                                details = [text]
+                product_data['details'] = details
+                # Product Code
+                code = None
+                code_p = soup.find('p', class_='Jk9Oz')
+                if code_p:
+                    code_text = code_p.text.strip()
+                    code_match = re.search(r'Product Code:\s*(\d+)', code_text)
+                    if code_match:
+                        code = code_match.group(1)
+                product_data['product_code'] = code
+                # Images
+                images = []
+                image_elements = soup.find_all('img', {'class': lambda x: x and 'product-image' in x.lower()})
+                for img in image_elements:
+                    # Get the full resolution image URL from data attributes
+                    full_res_url = img.get('src', '')
+                    if not full_res_url:
+                        full_res_url = img.get('data-src', '')
+                    if not full_res_url:
+                        full_res_url = img.get('data-full-image', '')
+                    
+                    # If we found a URL, clean it up
+                    if full_res_url:
+                        # Remove any size parameters
+                        full_res_url = full_res_url.split('?')[0]
+                        # Add full resolution parameters
+                        full_res_url = f"{full_res_url}?$n_960w$&wid=951&fit=constrain"
+                        images.append(full_res_url)
                 
+                product_data['images'] = images
                 # Add URL
                 product_data['url'] = product_url
-                
-                # If we found at least the price, return the data
                 if 'price' in product_data:
                     self.logger.info(f"Successfully scraped product: {product_data.get('name', 'Unknown')}")
                     return product_data
-                
             except Exception as e:
                 self.logger.warning(f"Selenium scraping failed: {str(e)}")
-            
-            # If we couldn't find any data, save the page source for debugging
             self.logger.error("Could not find any product details. Saving page source for debugging...")
             debug_path = f"asos_product_debug_{int(time.time())}.html"
             with open(debug_path, "w", encoding="utf-8") as f:
                 f.write(self.driver.page_source)
             raise Exception("Could not find any product details")
-            
         except Exception as e:
             self.logger.error(f"Error scraping product {product_url}: {str(e)}", exc_info=True)
             raise

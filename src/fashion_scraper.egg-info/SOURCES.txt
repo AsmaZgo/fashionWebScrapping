@@ -1,0 +1,17 @@
+README.md
+setup.py
+src/fashion_scraper/__init__.py
+src/fashion_scraper/main.py
+src/fashion_scraper.egg-info/PKG-INFO
+src/fashion_scraper.egg-info/SOURCES.txt
+src/fashion_scraper.egg-info/dependency_links.txt
+src/fashion_scraper.egg-info/requires.txt
+src/fashion_scraper.egg-info/top_level.txt
+src/fashion_scraper/asos/__init__.py
+src/fashion_scraper/asos/scraper.py
+src/fashion_scraper/common/__init__.py
+src/fashion_scraper/common/base_scraper.py
+src/fashion_scraper/tests/__init__.py
+src/fashion_scraper/tests/test_asos_scraper.py
+src/fashion_scraper/utils/__init__.py
+src/fashion_scraper/utils/logger.py

@@ -1,0 +1,12 @@
+selenium>=4.0.0
+beautifulsoup4>=4.9.3
+fake-useragent>=0.1.11
+webdriver-manager>=3.8.0
+tenacity>=8.0.1
+
+[dev]
+pytest>=7.0.0
+pytest-cov>=3.0.0
+black>=22.0.0
+isort>=5.10.0
+flake8>=4.0.0
