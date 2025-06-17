@@ -1,6 +1,7 @@
 # Fashion Web Scraping Project
 
 This project is designed to scrape fashion websites for clothing items, their features, and user comments. The scraped data is stored in both JSON and CSV formats for future data processing and analysis.
+The project was developped with the help of cursos, in order to test the technology.
 
 ## Project Structure
 
@@ -26,7 +27,7 @@ fashionWebScrapping/
 
 ## Features
 
-- Scrapes multiple fashion websites (ASOS, Zara, etc.)
+- Scrapes multiple fashion websites (ASOS, Zara, etc.). it currently supports only asos.
 - Extracts detailed product information:
   - Product name
   - Price

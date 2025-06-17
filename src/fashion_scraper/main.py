@@ -132,7 +132,9 @@ def main():
                         'about_me': product_data.get('about_me', ''),
                         'saved_count': product_data.get('saved_count'),
                         'ratings': product_data.get('ratings', {}),
-                        'recent_review': product_data.get('recent_review', {})
+                        'recent_review': product_data.get('recent_review', {}),
+                        'people_also_like': product_data.get('people_also_like', []),
+                        'people_also_bought': product_data.get('people_also_bought', [])
                     },
                     'reviews': product_data.get('reviews', [])
                 }

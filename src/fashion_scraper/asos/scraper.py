@@ -507,6 +507,68 @@ class AsosScraper(BaseScraper):
 
                 product_data['all_reviews'] = all_reviews
 
+                # Scrape "You Might Also Like" section
+                try:
+                    soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+                    might_like_section = soup.find('section', {'data-testid': 'mightLikeGrid'})
+                    might_like_products = []
+                    if might_like_section:
+                        self.logger.info("Found 'You Might Also Like' section")
+                        for li in might_like_section.select('ul.G4N4r > li.SuUpL'):
+                            product = {}
+                            a_tag = li.find('a', class_='Usg4d')
+                            if a_tag:
+                                product['url'] = a_tag['href']
+                                if a_tag.has_attr('aria-label'):
+                                    product['title'] = a_tag['aria-label'].split('. £')[0]
+                                else:
+                                    product['title'] = a_tag.get('title', '')
+                            img_tag = li.find('img', class_='gb1Ne')
+                            if img_tag:
+                                product['image'] = img_tag['src']
+                            price_span = li.find('span', {'data-testid': 'current-price'})
+                            if price_span:
+                                product['price'] = price_span.text.strip()
+                            if product:
+                                might_like_products.append(product)
+                        self.logger.info(f"Found {len(might_like_products)} products in 'You Might Also Like' section")
+                    else:
+                        self.logger.warning("Could not find 'You Might Also Like' section")
+                    product_data['people_also_like'] = might_like_products
+
+                    # Scrape "People Also Bought" section
+                    try:
+                        people_bought_section = soup.find('section', {'data-testid': 'carousel'})
+                        people_bought_products = []
+                        if people_bought_section:
+                            self.logger.info("Found 'People Also Bought' section")
+                            for li in people_bought_section.select('ul.styles-module_list__1fExD > li.styles-module_listItem__B41uo'):
+                                product = {}
+                                a_tag = li.find('a', class_='Usg4d')
+                                if a_tag:
+                                    product['url'] = a_tag['href']
+                                    if a_tag.has_attr('aria-label'):
+                                        product['title'] = a_tag['aria-label'].split('. £')[0]
+                                    else:
+                                        product['title'] = a_tag.get('title', '')
+                                img_tag = li.find('img', class_='gb1Ne')
+                                if img_tag:
+                                    product['image'] = img_tag['src']
+                                price_span = li.find('span', {'data-testid': 'current-price'})
+                                if price_span:
+                                    product['price'] = price_span.text.strip()
+                                if product:
+                                    people_bought_products.append(product)
+                            self.logger.info(f"Found {len(people_bought_products)} products in 'People Also Bought' section")
+                        else:
+                            self.logger.warning("Could not find 'People Also Bought' section")
+                        product_data['people_also_bought'] = people_bought_products
+                    except Exception as e:
+                        self.logger.warning(f"Error scraping 'People Also Bought': {str(e)}")
+
+                except Exception as e:
+                    self.logger.warning(f"Error scraping 'You Might Also Like': {str(e)}")
+
                 # Description
                 description_element = soup.find('div', class_=lambda x: x and 'description' in x.lower())
                 if description_element:
