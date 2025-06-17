@@ -394,18 +394,70 @@ class AsosScraper(BaseScraper):
                 # Get all reviews
                 all_reviews = []
                 try:
-                    # Click "View All Reviews" button to load all reviews
-                    view_all_button = self.driver.find_element(By.CSS_SELECTOR, 'button[data-testid="reviewsViewAll"]')
-                    if view_all_button:
-                        view_all_button.click()
-                        # Wait for reviews to load
-                        time.sleep(2)  # Give time for reviews to load
+                    # Handle cookie consent banner if present
+                    try:
+                        cookie_button = self.driver.find_element(By.ID, "onetrust-accept-btn-handler")
+                        if cookie_button:
+                            cookie_button.click()
+                            time.sleep(1)  # Wait for banner to disappear
+                    except:
+                        pass  # No cookie banner found, continue
+
+                    # Wait for reviews section to be present
+                    try:
+                        # First check if there are any reviews using the correct selector
+                        reviews_section = WebDriverWait(self.driver, 5).until(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, 'div[data-testid="reviewsSection"]'))
+                        )
                         
-                        # Get the updated page source after clicking
+                        # Get overall rating and review count first
+                        try:
+                            rating_div = reviews_section.find_element(By.CSS_SELECTOR, 'div[data-testid="overall-rating"]')
+                            if rating_div:
+                                try:
+                                    product_data['overall_rating'] = float(rating_div.text.strip())
+                                except (ValueError, TypeError):
+                                    product_data['overall_rating'] = None
+
+                            reviews_div = reviews_section.find_element(By.CSS_SELECTOR, 'div[data-testid="total-reviews"]')
+                            if reviews_div:
+                                try:
+                                    # Extract number from text like "(4 Reviews)"
+                                    reviews_text = reviews_div.text.strip()
+                                    product_data['total_reviews'] = int(reviews_text.strip('()').split()[0])
+                                except (ValueError, TypeError):
+                                    product_data['total_reviews'] = None
+                        except Exception as e:
+                            self.logger.warning(f"Error getting overall rating: {str(e)}")
+
+                        # Try to find and click the View All Reviews button
+                        try:
+                            view_all_button = WebDriverWait(self.driver, 5).until(
+                                EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="reviewsViewAll"]'))
+                            )
+                            
+                            # Scroll to the button to ensure it's in view
+                            self.driver.execute_script("arguments[0].scrollIntoView(true);", view_all_button)
+                            time.sleep(1)  # Wait for scroll to complete
+                            
+                            # Try to click using JavaScript if regular click fails
+                            try:
+                                view_all_button.click()
+                            except:
+                                self.driver.execute_script("arguments[0].click();", view_all_button)
+                            
+                            # Wait for reviews to load
+                            time.sleep(2)  # Give time for reviews to load
+                        except Exception as e:
+                            self.logger.warning(f"Could not click View All Reviews button: {str(e)}")
+                        
+                        # Get the updated page source
                         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
                         
-                        # Find all review sections
-                        review_sections = soup.find_all('section', {'aria-label': lambda x: x and 'Review' in x})
+                        # Find all review sections using the correct class
+                        review_sections = soup.find_all('section', {'class': 'x5rH4'})
+                        
+                        # Process each review section
                         for review_section in review_sections:
                             review_data = {}
                             
@@ -435,50 +487,23 @@ class AsosScraper(BaseScraper):
                             # Review text
                             review_button = review_section.find('button', {'data-testid': 'reviewsReadMore'})
                             if review_button:
-                                review_data['text'] = review_button.text.strip()
+                                # Get the full text from the button's aria-label
+                                full_text = review_button.get('aria-label', '')
+                                if full_text:
+                                    # Remove the "Read More" part
+                                    review_data['text'] = full_text.replace('... Read More', '')
+                                else:
+                                    # Fall back to button text
+                                    review_data['text'] = review_button.text.strip().replace('Read More', '')
 
                             if review_data:  # Only add if we found some data
                                 all_reviews.append(review_data)
                                 
+                    except Exception as e:
+                        self.logger.warning(f"No reviews section found: {str(e)}")
+                                
                 except Exception as e:
                     self.logger.warning(f"Error getting all reviews: {str(e)}")
-                    # If we can't get all reviews, at least get the visible ones
-                    reviews_container = soup.find('div', {'class': 'FUfrx'})
-                    if reviews_container:
-                        review_sections = reviews_container.find_all('section', {'aria-label': lambda x: x and 'Review' in x})
-                        for review_section in review_sections:
-                            review_data = {}
-                            
-                            # Review rating
-                            rating_p = review_section.find('p', {'class': 'seSWD'})
-                            if rating_p:
-                                try:
-                                    review_data['rating'] = float(rating_p.text.strip().split()[0])
-                                except (ValueError, IndexError):
-                                    review_data['rating'] = None
-
-                            # Review date
-                            date_span = review_section.find('span', {'class': 'L0xqb'})
-                            if date_span:
-                                review_data['date'] = date_span.text.strip()
-
-                            # Reviewer status
-                            status_p = review_section.find('p', {'class': 'm0ehn'})
-                            if status_p:
-                                review_data['status'] = status_p.text.strip()
-
-                            # Review title
-                            title_h4 = review_section.find('h4', {'class': 'DBTNB'})
-                            if title_h4:
-                                review_data['title'] = title_h4.text.strip()
-
-                            # Review text
-                            review_button = review_section.find('button', {'data-testid': 'reviewsReadMore'})
-                            if review_button:
-                                review_data['text'] = review_button.text.strip()
-
-                            if review_data:  # Only add if we found some data
-                                all_reviews.append(review_data)
 
                 product_data['all_reviews'] = all_reviews
 
