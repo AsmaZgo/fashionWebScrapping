@@ -21,9 +21,7 @@ URLS = [
     "https://www.asos.com/men/new-in/new-in-clothing/cat/?cid=6993&refine=attribute_1047:8391,8405#nlid=mw|new+in|new+products|hoodies+%26+sweatshirts",
     "https://www.asos.com/men/new-in/new-in-clothing/cat/?cid=6993&refine=attribute_10992:61394#nlid=mw|new+in|new+products|swimwear",
     "https://www.asos.com/men/new-in/cat/?cid=27110&refine=attribute_10992:61377",
-    "https://www.asos.com/men/new-in/new-in-accessories/cat/?cid=27112"
-   ]
-URLS = [
+    "https://www.asos.com/men/new-in/new-in-accessories/cat/?cid=27112",
     "https://www.asos.com/women/new-in/new-in-today/cat/?cid=51163",
     "https://www.asos.com/women/new-in/new-in-clothing/cat/?cid=2623",
     "https://www.asos.com/women/new-in/new-in-shoes/cat/?cid=6992",
